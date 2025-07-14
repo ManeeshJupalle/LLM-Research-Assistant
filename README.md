@@ -1,7 +1,4 @@
-I am not able to copy paste the structure as it is in the read me file, the same way its displayed here
-give me the text in a way that I looks the same the way you are generating here
-
-Here's the exact Markdown code formatted to preserve visual structure when copied into a README:
+ 
 
 ```markdown
 # Cross-Platform Mobile LLM-Powered Research Reader
@@ -119,16 +116,3 @@ docs/
   - Feature requirements (Aha!-style templates)  
   - Testing scenarios (Postman collections)
 ```
-
-**To use this properly:**  
-1. Copy the entire block above (including triple backticks)
-2. Paste directly into your GitHub README.md
-3. Replace placeholder values like `[REPO_URL]` with actual values
-4. Ensure GitHub-flavored Markdown is enabled in repository settings
-
-**Formatting Tips:**  
-- Use a Markdown editor like VS Code with the "Markdown" extension
-- Keep line breaks consistent (Unix-style LF)
-- Avoid mixing tabs and spaces in code blocks
-- Test rendering in GitHub's preview mode before committing
-

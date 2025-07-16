@@ -1,5 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { Upload, FileText, MessageSquare, BookOpen, Search, User, Settings, Download, Eye, Trash2, Plus } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Upload, FileText, MessageSquare, BookOpen, Search, User, Settings, Download, Eye, Trash2, Plus, AlertCircle } from 'lucide-react';
+
+const API_BASE_URL = 'http://localhost:5000/api';
 
 const ResearchReaderApp = () => {
   const [papers, setPapers] = useState([]);
@@ -10,53 +12,172 @@ const ResearchReaderApp = () => {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('papers');
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [error, setError] = useState('');
   const fileInputRef = useRef(null);
 
-  // Mock data for demonstration
-  const mockPapers = [
-    { id: 1, title: 'Attention Is All You Need', authors: 'Vaswani et al.', date: '2017', type: 'pdf' },
-    { id: 2, title: 'BERT: Pre-training of Deep Bidirectional Transformers', authors: 'Devlin et al.', date: '2018', type: 'pdf' },
-    { id: 3, title: 'GPT-3: Language Models are Few-Shot Learners', authors: 'Brown et al.', date: '2020', type: 'pdf' }
-  ];
+  // Fetch papers on component mount
+  useEffect(() => {
+    fetchPapers();
+  }, []);
 
-  const handleFileUpload = (event) => {
+  // Fetch chat history and notes when paper is selected
+  useEffect(() => {
+    if (selectedPaper) {
+      fetchChatHistory(selectedPaper._id);
+      fetchNotes(selectedPaper._id);
+      setSummary(selectedPaper.summary || '');
+    }
+  }, [selectedPaper]);
+
+  const fetchPapers = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/papers`);
+      const data = await response.json();
+      setPapers(data);
+    } catch (error) {
+      console.error('Error fetching papers:', error);
+      setError('Failed to load papers');
+    }
+  };
+
+  const fetchChatHistory = async (paperId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/papers/${paperId}/chat`);
+      const data = await response.json();
+      setChatHistory(data);
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+    }
+  };
+
+  const fetchNotes = async (paperId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/papers/${paperId}/notes`);
+      const data = await response.json();
+      setNotes(data.content || '');
+    } catch (error) {
+      console.error('Error fetching notes:', error);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
     const files = Array.from(event.target.files);
-    const newPapers = files.map((file, index) => ({
-      id: papers.length + index + 1,
-      title: file.name.replace('.pdf', ''),
-      authors: 'Unknown',
-      date: new Date().getFullYear().toString(),
-      type: file.type,
-      file: file
-    }));
-    setPapers([...papers, ...newPapers]);
+    setUploadLoading(true);
+    setError('');
+
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('paper', file);
+        formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
+        formData.append('authors', 'Unknown');
+
+        const response = await fetch(`${API_BASE_URL}/papers/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+      }
+
+      await fetchPapers();
+      setError('');
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      setError('Failed to upload files');
+    } finally {
+      setUploadLoading(false);
+    }
   };
 
   const generateSummary = async (paper) => {
+    if (!paper._id) return;
+    
     setLoading(true);
-    // Mock API call - replace with actual LLM integration
-    setTimeout(() => {
-      setSummary(`This paper "${paper.title}" presents groundbreaking research in the field. The authors propose a novel approach that significantly advances our understanding of the subject matter. Key contributions include innovative methodologies and comprehensive experimental validation. The results demonstrate substantial improvements over existing approaches, with implications for future research directions.`);
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/papers/${paper._id}/summary`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate summary');
+      }
+
+      const data = await response.json();
+      setSummary(data.summary);
+      
+      // Update the paper in the list
+      setPapers(papers.map(p => 
+        p._id === paper._id ? { ...p, summary: data.summary } : p
+      ));
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      setError('Failed to generate summary');
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   const handleQuestion = async () => {
-    if (!question.trim()) return;
+    if (!question.trim() || !selectedPaper) return;
     
     setLoading(true);
-    const newChat = { question, answer: '', timestamp: new Date() };
-    setChatHistory([...chatHistory, newChat]);
-    
-    // Mock API call - replace with actual LLM integration
-    setTimeout(() => {
-      const answer = `Based on the paper "${selectedPaper?.title}", here's my analysis: ${question} - This is a thoughtful question that relates to the core concepts discussed in the paper. The authors address this through their experimental methodology and provide compelling evidence for their claims.`;
-      setChatHistory(prev => prev.map((chat, idx) => 
-        idx === prev.length - 1 ? { ...chat, answer } : chat
-      ));
+    setError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/papers/${selectedPaper._id}/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get answer');
+      }
+
+      const data = await response.json();
+      setChatHistory(prev => [...prev, data]);
       setQuestion('');
+    } catch (error) {
+      console.error('Error asking question:', error);
+      setError('Failed to get answer');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
+  };
+
+  const saveNotes = async () => {
+    if (!selectedPaper) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/papers/${selectedPaper._id}/notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: notes }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save notes');
+      }
+
+      setError('');
+      // Could add a success message here
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      setError('Failed to save notes');
+    }
   };
 
   const PaperCard = ({ paper, onSelect }) => (
@@ -68,7 +189,7 @@ const ResearchReaderApp = () => {
         <div className="flex-1">
           <h3 className="font-semibold text-gray-800 mb-2">{paper.title}</h3>
           <p className="text-sm text-gray-600 mb-1">Authors: {paper.authors}</p>
-          <p className="text-sm text-gray-500">{paper.date}</p>
+          <p className="text-sm text-gray-500">{new Date(paper.uploadDate).toLocaleDateString()}</p>
         </div>
         <FileText className="w-5 h-5 text-gray-400 ml-2" />
       </div>
@@ -86,6 +207,15 @@ const ResearchReaderApp = () => {
         </div>
       )}
     </div>
+  );
+
+  const ErrorMessage = ({ message }) => (
+    message ? (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center">
+        <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+        <span className="text-red-700">{message}</span>
+      </div>
+    ) : null
   );
 
   return (
@@ -107,6 +237,8 @@ const ResearchReaderApp = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
+        <ErrorMessage message={error} />
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel - Papers Library */}
           <div className="lg:col-span-1">
@@ -115,10 +247,11 @@ const ResearchReaderApp = () => {
                 <h2 className="text-lg font-semibold text-gray-800">Paper Library</h2>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700"
+                  disabled={uploadLoading}
+                  className="bg-blue-600 text-white px-3 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 disabled:opacity-50"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>Upload</span>
+                  <span>{uploadLoading ? 'Uploading...' : 'Upload'}</span>
                 </button>
               </div>
               
@@ -141,7 +274,7 @@ const ResearchReaderApp = () => {
                 ) : (
                   papers.map(paper => (
                     <PaperCard
-                      key={paper.id}
+                      key={paper._id}
                       paper={paper}
                       onSelect={setSelectedPaper}
                     />
@@ -158,7 +291,7 @@ const ResearchReaderApp = () => {
                 {/* Paper Header */}
                 <div className="border-b p-6">
                   <h2 className="text-xl font-bold text-gray-800 mb-2">{selectedPaper.title}</h2>
-                  <p className="text-gray-600">by {selectedPaper.authors} ({selectedPaper.date})</p>
+                  <p className="text-gray-600">by {selectedPaper.authors} ({new Date(selectedPaper.uploadDate).getFullYear()})</p>
                 </div>
 
                 {/* Tabs */}
@@ -230,7 +363,7 @@ const ResearchReaderApp = () => {
                             disabled={loading || !question.trim()}
                             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                           >
-                            Ask
+                            {loading ? 'Asking...' : 'Ask'}
                           </button>
                         </div>
                       </div>
@@ -261,7 +394,10 @@ const ResearchReaderApp = () => {
                         className="w-full h-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                       />
                       <div className="mt-4 flex justify-end">
-                        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                        <button 
+                          onClick={saveNotes}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                        >
                           Save Notes
                         </button>
                       </div>

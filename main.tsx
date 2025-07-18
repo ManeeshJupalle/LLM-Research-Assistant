@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, MessageSquare, BookOpen, Search, User, Settings, Download, Eye, Trash2, Plus, AlertCircle } from 'lucide-react';
-
-const API_BASE_URL = 'http://localhost:5000/api';
+import PaperCard, { Paper } from './components/PaperCard';
+import ChatMessage, { Chat } from './components/ChatMessage';
+import ErrorMessage from './components/ErrorMessage';
+import * as api from './services/api';
 
 const ResearchReaderApp = () => {
-  const [papers, setPapers] = useState([]);
-  const [selectedPaper, setSelectedPaper] = useState(null);
+  const [papers, setPapers] = useState<Paper[]>([]);
+  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [summary, setSummary] = useState('');
   const [question, setQuestion] = useState('');
-  const [chatHistory, setChatHistory] = useState([]);
+  const [chatHistory, setChatHistory] = useState<Chat[]>([]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('papers');
@@ -32,8 +34,7 @@ const ResearchReaderApp = () => {
 
   const fetchPapers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/papers`);
-      const data = await response.json();
+      const data = await api.getPapers();
       setPapers(data);
     } catch (error) {
       console.error('Error fetching papers:', error);
@@ -43,8 +44,7 @@ const ResearchReaderApp = () => {
 
   const fetchChatHistory = async (paperId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${paperId}/chat`);
-      const data = await response.json();
+      const data = await api.getChatHistory(paperId);
       setChatHistory(data);
     } catch (error) {
       console.error('Error fetching chat history:', error);
@@ -53,8 +53,7 @@ const ResearchReaderApp = () => {
 
   const fetchNotes = async (paperId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${paperId}/notes`);
-      const data = await response.json();
+      const data = await api.getNotes(paperId);
       setNotes(data.content || '');
     } catch (error) {
       console.error('Error fetching notes:', error);
@@ -73,14 +72,7 @@ const ResearchReaderApp = () => {
         formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
         formData.append('authors', 'Unknown');
 
-        const response = await fetch(`${API_BASE_URL}/papers/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Upload failed');
-        }
+        await api.uploadPaper(formData);
       }
 
       await fetchPapers();
@@ -100,18 +92,7 @@ const ResearchReaderApp = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${paper._id}/summary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate summary');
-      }
-
-      const data = await response.json();
+      const data = await api.generateSummary(paper._id);
       setSummary(data.summary);
       
       // Update the paper in the list
@@ -133,19 +114,7 @@ const ResearchReaderApp = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${selectedPaper._id}/ask`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get answer');
-      }
-
-      const data = await response.json();
+      const data = await api.askQuestion(selectedPaper._id, { question });
       setChatHistory(prev => [...prev, data]);
       setQuestion('');
     } catch (error) {
@@ -160,18 +129,7 @@ const ResearchReaderApp = () => {
     if (!selectedPaper) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${selectedPaper._id}/notes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content: notes }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save notes');
-      }
-
+      await api.saveNotes(selectedPaper._id, { content: notes });
       setError('');
       // Could add a success message here
     } catch (error) {
@@ -179,44 +137,6 @@ const ResearchReaderApp = () => {
       setError('Failed to save notes');
     }
   };
-
-  const PaperCard = ({ paper, onSelect }) => (
-    <div 
-      className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-blue-500"
-      onClick={() => onSelect(paper)}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-800 mb-2">{paper.title}</h3>
-          <p className="text-sm text-gray-600 mb-1">Authors: {paper.authors}</p>
-          <p className="text-sm text-gray-500">{new Date(paper.uploadDate).toLocaleDateString()}</p>
-        </div>
-        <FileText className="w-5 h-5 text-gray-400 ml-2" />
-      </div>
-    </div>
-  );
-
-  const ChatMessage = ({ chat }) => (
-    <div className="mb-4">
-      <div className="bg-blue-50 p-3 rounded-lg mb-2">
-        <p className="text-sm font-medium text-blue-800">Q: {chat.question}</p>
-      </div>
-      {chat.answer && (
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-700">A: {chat.answer}</p>
-        </div>
-      )}
-    </div>
-  );
-
-  const ErrorMessage = ({ message }) => (
-    message ? (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center">
-        <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-        <span className="text-red-700">{message}</span>
-      </div>
-    ) : null
-  );
 
   return (
     <div className="min-h-screen bg-gray-100">

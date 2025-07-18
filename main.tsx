@@ -3,8 +3,7 @@ import { Upload, FileText, MessageSquare, BookOpen, Search, User, Settings, Down
 import PaperCard, { Paper } from './components/PaperCard';
 import ChatMessage, { Chat } from './components/ChatMessage';
 import ErrorMessage from './components/ErrorMessage';
-
-const API_BASE_URL = 'http://localhost:5000/api';
+import * as api from './services/api';
 
 const ResearchReaderApp = () => {
   const [papers, setPapers] = useState<Paper[]>([]);
@@ -35,8 +34,7 @@ const ResearchReaderApp = () => {
 
   const fetchPapers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/papers`);
-      const data = await response.json();
+      const data = await api.getPapers();
       setPapers(data);
     } catch (error) {
       console.error('Error fetching papers:', error);
@@ -46,8 +44,7 @@ const ResearchReaderApp = () => {
 
   const fetchChatHistory = async (paperId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${paperId}/chat`);
-      const data = await response.json();
+      const data = await api.getChatHistory(paperId);
       setChatHistory(data);
     } catch (error) {
       console.error('Error fetching chat history:', error);
@@ -56,8 +53,7 @@ const ResearchReaderApp = () => {
 
   const fetchNotes = async (paperId) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${paperId}/notes`);
-      const data = await response.json();
+      const data = await api.getNotes(paperId);
       setNotes(data.content || '');
     } catch (error) {
       console.error('Error fetching notes:', error);
@@ -76,14 +72,7 @@ const ResearchReaderApp = () => {
         formData.append('title', file.name.replace(/\.[^/.]+$/, ''));
         formData.append('authors', 'Unknown');
 
-        const response = await fetch(`${API_BASE_URL}/papers/upload`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Upload failed');
-        }
+        await api.uploadPaper(formData);
       }
 
       await fetchPapers();
@@ -103,18 +92,7 @@ const ResearchReaderApp = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${paper._id}/summary`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate summary');
-      }
-
-      const data = await response.json();
+      const data = await api.generateSummary(paper._id);
       setSummary(data.summary);
       
       // Update the paper in the list
@@ -136,19 +114,7 @@ const ResearchReaderApp = () => {
     setError('');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${selectedPaper._id}/ask`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get answer');
-      }
-
-      const data = await response.json();
+      const data = await api.askQuestion(selectedPaper._id, { question });
       setChatHistory(prev => [...prev, data]);
       setQuestion('');
     } catch (error) {
@@ -163,18 +129,7 @@ const ResearchReaderApp = () => {
     if (!selectedPaper) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/papers/${selectedPaper._id}/notes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content: notes }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save notes');
-      }
-
+      await api.saveNotes(selectedPaper._id, { content: notes });
       setError('');
       // Could add a success message here
     } catch (error) {

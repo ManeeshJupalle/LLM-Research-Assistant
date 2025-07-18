@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, FileText, MessageSquare, BookOpen, Search, User, Settings, Download, Eye, Trash2, Plus, AlertCircle } from 'lucide-react';
+import PaperCard, { Paper } from './components/PaperCard';
+import ChatMessage, { Chat } from './components/ChatMessage';
+import ErrorMessage from './components/ErrorMessage';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
 const ResearchReaderApp = () => {
-  const [papers, setPapers] = useState([]);
-  const [selectedPaper, setSelectedPaper] = useState(null);
+  const [papers, setPapers] = useState<Paper[]>([]);
+  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(null);
   const [summary, setSummary] = useState('');
   const [question, setQuestion] = useState('');
-  const [chatHistory, setChatHistory] = useState([]);
+  const [chatHistory, setChatHistory] = useState<Chat[]>([]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('papers');
@@ -179,44 +182,6 @@ const ResearchReaderApp = () => {
       setError('Failed to save notes');
     }
   };
-
-  const PaperCard = ({ paper, onSelect }) => (
-    <div 
-      className="bg-white rounded-lg shadow-md p-4 cursor-pointer hover:shadow-lg transition-shadow border-l-4 border-blue-500"
-      onClick={() => onSelect(paper)}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-800 mb-2">{paper.title}</h3>
-          <p className="text-sm text-gray-600 mb-1">Authors: {paper.authors}</p>
-          <p className="text-sm text-gray-500">{new Date(paper.uploadDate).toLocaleDateString()}</p>
-        </div>
-        <FileText className="w-5 h-5 text-gray-400 ml-2" />
-      </div>
-    </div>
-  );
-
-  const ChatMessage = ({ chat }) => (
-    <div className="mb-4">
-      <div className="bg-blue-50 p-3 rounded-lg mb-2">
-        <p className="text-sm font-medium text-blue-800">Q: {chat.question}</p>
-      </div>
-      {chat.answer && (
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-sm text-gray-700">A: {chat.answer}</p>
-        </div>
-      )}
-    </div>
-  );
-
-  const ErrorMessage = ({ message }) => (
-    message ? (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-center">
-        <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-        <span className="text-red-700">{message}</span>
-      </div>
-    ) : null
-  );
 
   return (
     <div className="min-h-screen bg-gray-100">

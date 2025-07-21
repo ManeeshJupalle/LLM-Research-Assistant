@@ -18,6 +18,7 @@ const ResearchReaderApp = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
+  const [search, setSearch] = useState('');
 
   // Fetch papers on component mount
   useEffect(() => {
@@ -153,6 +154,12 @@ const ResearchReaderApp = () => {
     }
   };
 
+  // Filter papers by search
+  const filteredPapers = papers.filter(paper =>
+    paper.title.toLowerCase().includes(search.toLowerCase()) ||
+    paper.authors.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -204,15 +211,26 @@ const ResearchReaderApp = () => {
                 className="hidden"
               />
 
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search by title or author..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Search papers"
+                />
+              </div>
+
               <div className="space-y-3">
-                {papers.length === 0 ? (
+                {filteredPapers.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                    <p>No papers uploaded yet</p>
-                    <p className="text-sm">Upload your first research paper to get started</p>
+                    <p>No papers found</p>
+                    <p className="text-sm">Try uploading or searching for a research paper</p>
                   </div>
                 ) : (
-                  papers.map(paper => (
+                  filteredPapers.map(paper => (
                     <PaperCard
                       key={paper._id}
                       paper={paper}

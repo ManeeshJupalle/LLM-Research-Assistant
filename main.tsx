@@ -16,6 +16,7 @@ const ResearchReaderApp = () => {
   const [activeTab, setActiveTab] = useState('papers');
   const [uploadLoading, setUploadLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const fileInputRef = useRef(null);
 
   // Fetch papers on component mount
@@ -76,6 +77,7 @@ const ResearchReaderApp = () => {
       }
 
       await fetchPapers();
+      setSuccess('Files uploaded successfully!');
       setError('');
     } catch (error) {
       console.error('Error uploading files:', error);
@@ -99,6 +101,7 @@ const ResearchReaderApp = () => {
       setPapers(papers.map(p => 
         p._id === paper._id ? { ...p, summary: data.summary } : p
       ));
+      setSuccess('Summary generated successfully!');
     } catch (error) {
       console.error('Error generating summary:', error);
       setError('Failed to generate summary');
@@ -130,11 +133,23 @@ const ResearchReaderApp = () => {
 
     try {
       await api.saveNotes(selectedPaper._id, { content: notes });
-      setError('');
+      setSuccess('Notes saved successfully!');
       // Could add a success message here
     } catch (error) {
       console.error('Error saving notes:', error);
       setError('Failed to save notes');
+    }
+  };
+
+  const deletePaper = async (paperId: string) => {
+    if (!window.confirm('Are you sure you want to delete this paper? This action cannot be undone.')) return;
+    try {
+      await api.deletePaper(paperId);
+      setSuccess('Paper deleted successfully!');
+      setSelectedPaper(null);
+      fetchPapers();
+    } catch (error) {
+      setError('Failed to delete paper');
     }
   };
 
@@ -158,6 +173,11 @@ const ResearchReaderApp = () => {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <ErrorMessage message={error} />
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4 flex items-center">
+            <span className="text-green-700">{success}</span>
+          </div>
+        )}
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel - Papers Library */}
@@ -212,6 +232,12 @@ const ResearchReaderApp = () => {
                 <div className="border-b p-6">
                   <h2 className="text-xl font-bold text-gray-800 mb-2">{selectedPaper.title}</h2>
                   <p className="text-gray-600">by {selectedPaper.authors} ({new Date(selectedPaper.uploadDate).getFullYear()})</p>
+                  <button
+                    onClick={() => deletePaper(selectedPaper._id)}
+                    className="ml-4 bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700"
+                  >
+                    <Trash2 className="w-4 h-4 inline-block mr-1" /> Delete
+                  </button>
                 </div>
 
                 {/* Tabs */}
